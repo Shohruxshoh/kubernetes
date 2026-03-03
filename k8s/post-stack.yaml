@@ -1,0 +1,105 @@
+# ====================================
+# 1. POST DATABASE (Postgres)
+# ====================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: post-db
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: post-db
+  template:
+    metadata:
+      labels:
+        app: post-db
+    spec:
+      containers:
+      - name: postgres
+        image: postgres:15-alpine
+        ports:
+        - containerPort: 5432
+        env:
+        - name: POSTGRES_USER
+          value: "postgres"
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: blog-secrets
+              key: db-password
+        - name: POSTGRES_DB
+          value: "post_db"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: post-db-service
+spec:
+  selector:
+    app: post-db
+  ports:
+    - protocol: TCP
+      port: 5432
+      targetPort: 5432
+
+# ====================================
+# 2. POST SERVICE (FastAPI)
+# ====================================
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: post-api
+spec:
+  replicas: 5
+  selector:
+    matchLabels:
+      app: post-api
+  template:
+    metadata:
+      labels:
+        app: post-api
+    spec:
+      containers:
+      - name: post-api
+        image: post_service:latest
+        imagePullPolicy: Never
+        ports:
+        - containerPort: 8001
+        env:
+        - name: POST_DB_URL
+          valueFrom:
+            configMapKeyRef:
+              name: blog-config
+              key: POST_DB_URL
+        - name: KAFKA_BOOTSTRAP_SERVERS
+          valueFrom:
+            configMapKeyRef:
+              name: blog-config
+              key: KAFKA_BOOTSTRAP_SERVERS
+        - name: SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: blog-secrets
+              key: jwt-secret
+        # MANA SHU QISMNI QO'SHING:
+        - name: REDIS_URL
+          valueFrom:
+           configMapKeyRef:
+             name: blog-config
+             key: REDIS_URL
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: post-api-service
+spec:
+  type: NodePort
+  selector:
+    app: post-api
+  ports:
+    - protocol: TCP
+      port: 8001
+      targetPort: 8001
+      nodePort: 30001 # Brauzer uchun manzil

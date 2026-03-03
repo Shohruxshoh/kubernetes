@@ -1,0 +1,94 @@
+# ====================================
+# 1. NOTIFICATION DATABASE (Postgres)
+# ====================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: notif-db
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: notif-db
+  template:
+    metadata:
+      labels:
+        app: notif-db
+    spec:
+      containers:
+      - name: postgres
+        image: postgres:15-alpine
+        ports:
+        - containerPort: 5432
+        env:
+        - name: POSTGRES_USER
+          value: "postgres"
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: blog-secrets
+              key: db-password
+        - name: POSTGRES_DB
+          value: "notif_db"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: notif-db-service
+spec:
+  selector:
+    app: notif-db
+  ports:
+    - protocol: TCP
+      port: 5432
+      targetPort: 5432
+
+# ====================================
+# 2. NOTIFICATION SERVICE (FastAPI)
+# ====================================
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: notif-api
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: notif-api
+  template:
+    metadata:
+      labels:
+        app: notif-api
+    spec:
+      containers:
+      - name: notif-api
+        image: notification_service:latest
+        imagePullPolicy: Never
+        ports:
+        - containerPort: 8003
+        env:
+        - name: NOTIF_DB_URL
+          valueFrom:
+            configMapKeyRef:
+              name: blog-config
+              key: NOTIF_DB_URL
+        - name: KAFKA_BOOTSTRAP_SERVERS
+          valueFrom:
+            configMapKeyRef:
+              name: blog-config
+              key: KAFKA_BOOTSTRAP_SERVERS
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: notif-api-service
+spec:
+  type: NodePort
+  selector:
+    app: notif-api
+  ports:
+    - protocol: TCP
+      port: 8003
+      targetPort: 8003
+      nodePort: 30003

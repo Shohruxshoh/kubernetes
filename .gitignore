@@ -1,0 +1,17 @@
+# Maxfiy sozlamalar va parollar
+.env
+.idea
+.idea/*
+# Python kesh fayllari
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual muhitlar (agar ishlatgan bo'lsangiz)
+venv/
+env/
+.venv/
+
+# Operatsion tizim fayllari
+.DS_Store
+Thumbs.db

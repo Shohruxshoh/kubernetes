@@ -1,0 +1,95 @@
+# ====================================
+# 1. AUTH DATABASE (Postgres)
+# ====================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: auth-db
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: auth-db
+  template:
+    metadata:
+      labels:
+        app: auth-db
+    spec:
+      containers:
+      - name: postgres
+        image: postgres:15-alpine
+        ports:
+        - containerPort: 5432
+        env:
+        - name: POSTGRES_USER
+          value: "postgres"
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: blog-secrets
+              key: db-password
+        - name: POSTGRES_DB
+          value: "auth_db"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: auth-db-service
+spec:
+  selector:
+    app: auth-db
+  ports:
+    - protocol: TCP
+      port: 5432
+      targetPort: 5432
+
+# ====================================
+# 2. AUTH SERVICE (FastAPI)
+# ====================================
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: auth-api
+spec:
+  replicas: 1 # Yuklama oshsa shuni 3-4 qilsak, nusxalar ko'payadi!
+  selector:
+    matchLabels:
+      app: auth-api
+  template:
+    metadata:
+      labels:
+        app: auth-api
+    spec:
+      containers:
+      - name: auth-api
+        image: auth_service:latest
+        imagePullPolicy: Never # Lokal imijni ishlatish uchun
+        ports:
+        - containerPort: 8000
+        env:
+        - name: AUTH_DB_URL
+          valueFrom:
+            configMapKeyRef:
+              name: blog-config
+              key: AUTH_DB_URL
+        - name: SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: blog-secrets
+              key: jwt-secret
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: auth-api-service
+spec:
+  type: NodePort # Tashqaridan (brauzerdan) kirish uchun
+  selector:
+    app: auth-api
+  ports:
+    - protocol: TCP
+      port: 8000
+      targetPort: 8000
+      nodePort: 30000 # Brauzerda localhost:30000 orqali kiramiz
+

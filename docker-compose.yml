@@ -1,0 +1,161 @@
+version: '3.8'
+
+services:
+  # ==========================================
+  # 1. KAFKA VA ZOOKEEPER (Xabarlar markazi)
+  # ==========================================
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.3.0
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2181:2181"
+    volumes:
+      - zookeeper_data:/var/lib/zookeeper/data
+      - zookeeper_log:/var/lib/zookeeper/log
+
+  kafka:
+    image: confluentinc/cp-kafka:7.3.0
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    volumes:
+      - kafka_data:/var/lib/kafka/data
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-topics --bootstrap-server localhost:9092 --list"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ==========================================
+  # 2. MA'LUMOTLAR BAZALARI (PostgreSQL)
+  # ==========================================
+  auth_db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: admin123
+      POSTGRES_DB: auth_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - auth_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d auth_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  post_db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: admin123
+      POSTGRES_DB: post_db
+    ports:
+      - "5433:5432"
+    volumes:
+      - post_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d post_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  view_db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: admin123
+      POSTGRES_DB: view_db
+    ports:
+      - "5434:5432"
+    volumes:
+      - view_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d view_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  notif_db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: admin123
+      POSTGRES_DB: notif_db
+    ports:
+      - "5435:5432"
+    volumes:
+      - notif_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d notif_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # ==========================================
+  # 3. MIKROXIZMATLAR (Biz yozgan kodlar)
+  # ==========================================
+  auth_service:
+    build: ./auth_service
+    env_file: .env
+    ports:
+      - "8000:8000"
+    depends_on:
+      auth_db:
+        condition: service_healthy
+
+  post_service:
+    build: ./post_service
+    env_file: .env
+    ports:
+      - "8001:8001"
+    depends_on:
+      post_db:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+
+  view_service:
+    build: ./view_service
+    env_file: .env
+    ports:
+      - "8002:8002"
+    depends_on:
+      view_db:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+
+  notification_service:
+    build: ./notification_service
+    env_file: .env
+    ports:
+      - "8003:8003"
+    depends_on:
+      notif_db:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+
+# ==========================================
+# 4. VOLUMELAR RO'YXATI (Majburiy)
+# ==========================================
+volumes:
+  auth_db_data:
+  post_db_data:
+  view_db_data:
+  notif_db_data:
+  zookeeper_data:
+  zookeeper_log:
+  kafka_data:

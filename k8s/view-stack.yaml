@@ -1,0 +1,94 @@
+# ====================================
+# 1. VIEW DATABASE (Postgres)
+# ====================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: view-db
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: view-db
+  template:
+    metadata:
+      labels:
+        app: view-db
+    spec:
+      containers:
+      - name: postgres
+        image: postgres:15-alpine
+        ports:
+        - containerPort: 5432
+        env:
+        - name: POSTGRES_USER
+          value: "postgres"
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: blog-secrets
+              key: db-password
+        - name: POSTGRES_DB
+          value: "view_db"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: view-db-service
+spec:
+  selector:
+    app: view-db
+  ports:
+    - protocol: TCP
+      port: 5432
+      targetPort: 5432
+
+# ====================================
+# 2. VIEW SERVICE (FastAPI)
+# ====================================
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: view-api
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: view-api
+  template:
+    metadata:
+      labels:
+        app: view-api
+    spec:
+      containers:
+      - name: view-api
+        image: view_service:latest
+        imagePullPolicy: Never
+        ports:
+        - containerPort: 8002
+        env:
+        - name: VIEW_DB_URL
+          valueFrom:
+            configMapKeyRef:
+              name: blog-config
+              key: VIEW_DB_URL
+        - name: KAFKA_BOOTSTRAP_SERVERS
+          valueFrom:
+            configMapKeyRef:
+              name: blog-config
+              key: KAFKA_BOOTSTRAP_SERVERS
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: view-api-service
+spec:
+  type: NodePort
+  selector:
+    app: view-api
+  ports:
+    - protocol: TCP
+      port: 8002
+      targetPort: 8002
+      nodePort: 30002

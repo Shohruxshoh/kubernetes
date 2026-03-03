@@ -1,0 +1,57 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: blog-api-gateway
+  annotations:
+    # Qorovul sifatida NGINX ishlatamiz
+    kubernetes.io/ingress.class: "nginx"
+    # Yo'naltirishdan oldin prefiksni (/auth, /post) qirqib tashlash mantiqi
+    nginx.ingress.kubernetes.io/rewrite-target: /$2
+spec:
+  rules:
+  - host: api.blog.local  # Dasturimizning rasmiy domeni
+    http:
+      paths:
+      # ==========================================
+      # 1. AUTH SERVICE (/auth/...)
+      # ==========================================
+      - path: /auth(/|$)(.*)
+        pathType: Prefix
+        backend:
+          service:
+            name: auth-api-service # Sizning K8s Servicingiz nomi
+            port:
+              number: 8000
+
+      # ==========================================
+      # 2. POST SERVICE (/post/...)
+      # ==========================================
+      - path: /post(/|$)(.*)
+        pathType: Prefix
+        backend:
+          service:
+            name: post-api-service
+            port:
+              number: 8001
+
+      # ==========================================
+      # 3. VIEW SERVICE (/view/...)
+      # ==========================================
+      - path: /view(/|$)(.*)
+        pathType: Prefix
+        backend:
+          service:
+            name: view-api-service
+            port:
+              number: 8002
+
+      # ==========================================
+      # 4. NOTIFICATION SERVICE (/notif/...)
+      # ==========================================
+      - path: /notif(/|$)(.*)
+        pathType: Prefix
+        backend:
+          service:
+            name: notif-api-service
+            port:
+              number: 8003
